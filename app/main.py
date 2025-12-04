@@ -1,11 +1,8 @@
 from fastapi import FastAPI
-from app.routers import pets, users
+from app.pets.routers import router as pets_router
+from app.users.routers import router as users_router
 
 app = FastAPI(title="Pet Finder API")
 
-@app.get("/health")
-def health_check():
-    return {"status": "ok"}
-
-app.include_router(pets.router)
-app.include_router(users.router)
+app.include_router(users_router)
+app.include_router(pets_router)
