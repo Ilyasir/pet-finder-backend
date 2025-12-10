@@ -1,5 +1,4 @@
-from sqlalchemy import Column, Integer, String, Text, Date, TIMESTAMP, ForeignKey, Enum
-from sqlalchemy.sql import func
+from sqlalchemy import Column, Integer, String, Text, Date, Time, ForeignKey, Enum
 from sqlalchemy.orm import relationship
 from app.database import Base
 import enum
@@ -18,13 +17,20 @@ class Pet(Base):
     owner = relationship("User", back_populates="pets")
 
     type = Column(String(50), nullable=False)
+    breed = Column(String(100), nullable=True)
     name = Column(String(255), nullable=True)
-    description = Column(Text, nullable=True)
-    city = Column(String(255), nullable=False)
-    last_seen = Column(Text, nullable=True)
-    date_lost = Column(Date, nullable=True)
-    photo_url = Column(String(255), nullable=True)
+    color = Column(String(100), nullable=False)
+    sex = Column(String(10), nullable=False)
+    age = Column(String(50), nullable=True)
+    chip_number = Column(String(100), nullable=True)
+    brand_number = Column(String(100), nullable=True)
+
+    found_date = Column(Date, nullable=False)
+    found_time = Column(Time, nullable=False)
+    address = Column(String(255), nullable=False)
+
+    description = Column(Text, nullable=False)
+
+    photo_url = Column(String(500), nullable=True)
 
     status = Column(Enum(PetStatus, name="pet_status"), nullable=False, default=PetStatus.lost)
-
-    created_at = Column(TIMESTAMP, server_default=func.now())

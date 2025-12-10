@@ -1,10 +1,12 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Request
 from typing import List
+from pathlib import Path
 
 from app.pets.schemas import SPetCreate, SPetResponse, SPetUpdate
 from app.pets.services import PetService
 from app.users.dependencies import get_current_user
 from app.users.models import User
+from app.utils.files import ensure_media_dir, secure_filename, validate_image_and_save, MEDIA_ROOT
 
 router = APIRouter(prefix="/pets", tags=["Питомцы"])
 
@@ -22,7 +24,7 @@ async def get_pet(pet_id: int):
     return pet
 
 
-@router.post("/", response_model=SPetResponse)
+@router.post("/", response_model=SPetResponse, status_code=201)
 async def create_pet(pet: SPetCreate, current_user: User = Depends(get_current_user)):
     payload = pet.model_dump()
     payload["owner_id"] = current_user.id
@@ -32,9 +34,6 @@ async def create_pet(pet: SPetCreate, current_user: User = Depends(get_current_u
 
 @router.put("/{pet_id}", response_model=SPetResponse)
 async def update_pet(pet_id: int, pet_update: SPetUpdate, current_user: User = Depends(get_current_user)):
-    """
-    Обновление — только если текущий пользователь владелец.
-    """
     pet_obj = await PetService.find_by_id(pet_id)
     if not pet_obj:
         raise HTTPException(status_code=404, detail="Питомец не найден")
@@ -49,9 +48,6 @@ async def update_pet(pet_id: int, pet_update: SPetUpdate, current_user: User = D
 
 @router.delete("/{pet_id}", status_code=status.HTTP_200_OK)
 async def delete_pet(pet_id: int, current_user: User = Depends(get_current_user)):
-    """
-    Удаление — только владелец.
-    """
     pet_obj = await PetService.find_by_id(pet_id)
     if not pet_obj:
         raise HTTPException(status_code=404, detail="Питомец не найден")
@@ -63,3 +59,30 @@ async def delete_pet(pet_id: int, current_user: User = Depends(get_current_user)
     if not ok:
         raise HTTPException(status_code=500, detail="Ошибка при удалении")
     return {"detail": "Питомец удалён"}
+
+@router.post("/{pet_id}/upload_photo", response_model=SPetResponse)
+async def upload_pet_photo(pet_id: int, file: UploadFile = File(...), current_user: User = Depends(get_current_user)):
+    pet = await PetService.find_by_id(pet_id)
+    if not pet:
+        raise HTTPException(status_code=404, detail="Питомец не найден")
+    if pet.owner_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Нет прав на загрузку фото для этого питомца")
+
+    ensure_media_dir()
+
+    fname = secure_filename(file.filename)
+    dest = Path("media/pets") / str(pet_id)
+    dest.mkdir(parents=True, exist_ok=True)
+    file_path = dest / fname
+
+    try:
+        validate_image_and_save(file, file_path)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    finally:
+        file.file.close()
+
+    photo_url = f"/media/pets/{pet_id}/{fname}"
+
+    updated = await PetService.update_pet(pet_id, {"photo_url": photo_url})
+    return updated
