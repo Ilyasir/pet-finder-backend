@@ -20,7 +20,7 @@ class SPetBase(BaseModel):
     status: PetStatus = PetStatus.lost
 
 class SPetCreate(SPetBase):
-    owner_id: int
+    pass
 
 class SPetUpdate(BaseModel):
     type: Optional[str] = None

@@ -1,7 +1,9 @@
 from app.database import async_session
 from app.pets.models import Pet
 from sqlalchemy.future import select
+
 from app.base import BaseService
+
 
 class PetService(BaseService):
     model = Pet

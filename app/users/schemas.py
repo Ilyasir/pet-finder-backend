@@ -7,6 +7,10 @@ class SUserBase(BaseModel):
 class SUserCreate(SUserBase):
     password: str
 
+class SUserLogin(BaseModel):
+    email: EmailStr
+    password: str
+
 class SUserResponse(SUserBase):
     id: int
     created_at: datetime
