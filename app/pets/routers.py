@@ -1,12 +1,16 @@
 from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Request
 from typing import List
 from pathlib import Path
-
+from tempfile import NamedTemporaryFile
+import shutil
 from app.pets.schemas import SPetCreate, SPetResponse, SPetUpdate
 from app.pets.services import PetService
 from app.users.dependencies import get_current_user
 from app.users.models import User
 from app.utils.files import ensure_media_dir, secure_filename, validate_image_and_save, MEDIA_ROOT
+
+from app.ml.embeddings import image_to_embedding
+from app.ml.breed_classifier import dog_breed_model
 
 router = APIRouter(prefix="/pets", tags=["Питомцы"])
 
@@ -83,6 +87,55 @@ async def upload_pet_photo(pet_id: int, file: UploadFile = File(...), current_us
         file.file.close()
 
     photo_url = f"/media/pets/{pet_id}/{fname}"
+    try:
+        emb = image_to_embedding(str(file_path))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Ошибка при обработке изображения: {e}")
 
-    updated = await PetService.update_pet(pet_id, {"photo_url": photo_url})
+    updated = await PetService.update_pet(pet_id, {"photo_url": photo_url, "embedding": emb})
     return updated
+
+
+@router.post("/find_similar")
+async def find_similar_pets(type: str, file: UploadFile = File(...)):
+    """
+    Загружает фото -> считает embedding -> ищет 5 самых похожих питомцев этого типа
+    """
+    temp_path = Path("media/temp")
+    temp_path.mkdir(parents=True, exist_ok=True)
+
+    ext = Path(file.filename).suffix.lower()
+    temp_file = temp_path / f"query{ext}"
+
+    data = file.file.read()
+    with open(temp_file, "wb") as f:
+        f.write(data)
+    file.file.close()
+
+    try:
+        query_emb = image_to_embedding(str(temp_file))
+    except Exception as e:
+        temp_file.unlink(missing_ok=True)
+        raise HTTPException(status_code=500, detail=f"Ошибка при обработке изображения: {e}")
+
+    result = await PetService.find_similar_by_embedding(type, query_emb, top_k=5)
+    temp_file.unlink(missing_ok=True)
+    return result
+
+
+@router.post("/predict_breed")
+async def predict_breed(file: UploadFile = File(...)):
+    """
+    Принимает фото собаки -> возвращает породу.
+    """
+
+    with NamedTemporaryFile(delete=False, suffix=".jpg") as tmp:
+        shutil.copyfileobj(file.file, tmp)
+        tmp_path = tmp.name
+
+    try:
+        result = dog_breed_model.predict(tmp_path)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Ошибка обработки изображения: {e}")
+
+    return result

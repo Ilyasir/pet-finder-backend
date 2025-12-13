@@ -1,5 +1,6 @@
-from sqlalchemy import Column, Integer, String, Text, Date, Time, ForeignKey, Enum
+from sqlalchemy import Column, Integer, String, Text, Date, Time, ForeignKey, Enum, Float
 from sqlalchemy.orm import relationship
+from sqlalchemy.dialects.postgresql import ARRAY
 from app.database import Base
 import enum
 
@@ -34,3 +35,4 @@ class Pet(Base):
     photo_url = Column(String(500), nullable=True)
 
     status = Column(Enum(PetStatus, name="pet_status"), nullable=False, default=PetStatus.lost)
+    embedding = Column(ARRAY(Float), nullable=True)

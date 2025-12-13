@@ -1,9 +1,11 @@
+import numpy as np
+
 from app.database import async_session
 from app.pets.models import Pet
 from sqlalchemy.future import select
 
 from app.base import BaseService
-
+from app.pets.schemas import SPetResponse
 
 class PetService(BaseService):
     model = Pet
@@ -46,3 +48,31 @@ class PetService(BaseService):
             await session.delete(pet)
             await session.commit()
             return True
+        
+    @classmethod
+    async def find_similar_by_embedding(cls, pet_type: str, emb: list[float], top_k: int = 5):
+        emb_np = np.array(emb, dtype=np.float32)
+
+        async with async_session() as session:
+            q = select(Pet).where(
+                Pet.type == pet_type,
+                Pet.embedding.isnot(None)
+            )
+            res = await session.execute(q)
+            pets = res.scalars().all()
+
+        if not pets:
+            return []
+
+        scored = []
+        for pet in pets:
+            vec = np.array(pet.embedding, dtype=np.float32)
+            score = float(np.dot(emb_np, vec))
+
+            scored.append({
+                "pet": SPetResponse.from_orm(pet),
+                "score": score
+            })
+
+        scored.sort(key=lambda x: x["score"], reverse=True)
+        return scored[:top_k]
