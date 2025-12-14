@@ -48,7 +48,15 @@ class PetService(BaseService):
             await session.delete(pet)
             await session.commit()
             return True
-        
+    
+    @classmethod
+    async def find_by_owner(cls, owner_id: int):
+        async with async_session() as session:
+            q = select(Pet).where(Pet.owner_id == owner_id)
+            res = await session.execute(q)
+            pets = res.scalars().all()
+            return pets
+
     @classmethod
     async def find_similar_by_embedding(cls, pet_type: str, emb: list[float], top_k: int = 5):
         emb_np = np.array(emb, dtype=np.float32)

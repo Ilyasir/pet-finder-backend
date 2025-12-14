@@ -19,6 +19,9 @@ router = APIRouter(prefix="/pets", tags=["Питомцы"])
 async def get_pets():
     return await PetService.find_all()
 
+@router.get("/my", response_model=List[SPetResponse])
+async def get_my_pets(current_user: User = Depends(get_current_user)):
+    return await PetService.find_by_owner(current_user.id)
 
 @router.get("/{pet_id}", response_model=SPetResponse)
 async def get_pet(pet_id: int):
